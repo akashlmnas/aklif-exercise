@@ -21,7 +21,7 @@ export default class Setup extends Command {
     ])
 
     // Define hidden folder path (example: ~/.mycli/)
-    const hiddenDir = path.join(process.env.HOME || process.env.USERPROFILE || '.', '.mycli')
+    const hiddenDir = path.join(process.env.HOME || process.env.USERPROFILE || '.', '.akash')
     const configFile = path.join(hiddenDir, 'config.json')
 
     // Ensure folder exists
