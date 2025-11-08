@@ -260,3 +260,175 @@ export default class Setup extends Command {
 // }
 
 
+
+//====serverscript
+
+// import frappe
+
+// @frappe.whitelist()
+// def get_overdue_stories():
+//     return frappe.get_all(
+//         "Project Task",
+//         filters={
+//             "status": "Open",
+//             "due_date": ("<", frappe.utils.nowdate())
+//         },
+//         fields=["name", "subject", "due_date"]
+//     )
+//========================================================================bpmn
+
+// ┌─────────────────────────────┐
+// │          START EVENT        │
+// └──────────────┬──────────────┘
+//                │
+//                ▼
+//      ┌─────────────────────┐
+//      │ Oclif Command Start │  (user runs command:  lens pr:overdue )
+//      └───────────┬─────────┘
+//                  │
+//                  ▼
+//      ┌──────────────────────────────┐
+//      │ Load config.json (auth info) │
+//      └───────┬──────────────────────┘
+//              │
+//      ┌───────┴───────────┐
+//      │ Config exists?     │─── No ───→ ❌  THROW ERROR: "Config missing"
+//      └───────┬───────────┘
+//              │ Yes
+//              ▼
+//      ┌──────────────────────────────┐
+//      │ Build Frappe API request URL │
+//      │ + Add Filters:               │
+//      │   status = "Open"            │
+//      │   due_date < today           │
+//      └────────┬─────────────────────┘
+//               │
+//               ▼
+//      ┌──────────────────────────────┐
+//      │  Send HTTP Fetch Request     │
+//      │  with Auth header (API key)  │
+//      └─────────┬────────────────────┘
+//                │
+//      ┌─────────┴──────────┐
+//      │ API Response 200?   │── No → ❌  SHOW ERROR: "API Failure"
+//      └─────────┬──────────┘
+//                │ Yes
+//                ▼
+//      ┌─────────────────────────────┐
+//      │ Parse JSON → extract Story  │
+//      │ fields: id, title, due_date │
+//      └────────┬────────────────────┘
+//               │
+//               ▼
+//      ┌─────────────────────────────┐
+//      │ Display in CLI in table     │
+//      │ formatting (pretty output)  │
+//      └──────────┬──────────────────┘
+//                 │
+//                 ▼
+//      ┌─────────────────────────────┐
+//      │      END EVENT (Success)    │
+//      └─────────────────────────────┘
+
+
+//=======
+──────────────────────────────────────────────────────────────────────────────
+LANE: Developer (CLI User)
+──────────────────────────────────────────────────────────────────────────────
+  ● Start Event: User triggers command
+        │
+        ▼
+  Task: Run CLI Command → `lens story:overdue`
+
+──────────────────────────────────────────────────────────────────────────────
+LANE: OCLIF CLI Application
+──────────────────────────────────────────────────────────────────────────────
+        │
+        ▼
+  Task: Load `config.json` (contains base URL + API keys)
+        │
+        ▼
+  Decision Gateway: Config exists?
+        ├── No → Error Event → Display: "❌ Configuration missing"
+        │              ↓
+        │          End (Failure)
+        │
+        └── Yes → continue
+        ▼
+  Task: Build Fetch URL for Frappe API  
+        `/api/resource/Task?filters=[["status","=","Open"],["exp_end_date","<","today"]]`
+        │
+        ▼
+  Task: Send HTTP Request (fetch)  
+       Authentication header: `Authorization: token <key>:<secret>`
+        │
+        ▼
+
+──────────────────────────────────────────────────────────────────────────────
+LANE: Frappe ERP Backend
+──────────────────────────────────────────────────────────────────────────────
+  Intermediate Event (API received)
+        │
+        ▼
+  Task: Validate authentication token
+        │
+        ▼
+  Decision Gateway: Authentication valid?
+        ├── No → API Response → 401 Unauthorized
+        │          ↓
+        │     Error Event → CLI displays "Invalid Token"
+        │
+        └── Yes → continue
+        ▼
+  Task: Apply filter on Task DocType:
+        status = "Open"
+        exp_end_date < current_date
+        │
+        ▼
+
+──────────────────────────────────────────────────────────────────────────────
+LANE: Frappe Database (MariaDB)
+──────────────────────────────────────────────────────────────────────────────
+  Task: Query table `tabTask`
+        SELECT name, subject, exp_end_date
+        WHERE status = 'Open' AND exp_end_date < TODAY
+        │
+        ▼
+  Return result set to Backend (JSON)
+
+──────────────────────────────────────────────────────────────────────────────
+LANE: Frappe ERP Backend
+──────────────────────────────────────────────────────────────────────────────
+        │
+        ▼
+  Task: Format result into JSON API response
+  Response Example:
+        {
+            "data": [
+                { "name": "US-2024-001", "subject": "Fix bug...", "exp_end_date": "2025-11-02" }
+            ]
+        }
+        │
+        ▼
+  Send Response → Back to CLI
+
+──────────────────────────────────────────────────────────────────────────────
+LANE: OCLIF CLI Application
+──────────────────────────────────────────────────────────────────────────────
+        │
+        ▼
+  Decision Gateway: Does response contain stories?
+        ├── No → Display: "✅ No overdue stories found"
+        └── Yes → continue
+        ▼
+  Task: Format output into table
+  Task: Display in terminal:
+        | Story ID | Title       | Due Date |
+        |----------|-------------|----------|
+        | US-2024  | Fix Button  | 2025-11-02 |
+
+        │
+        ▼
+  ● End Event (Success): CLI task completed
+──────────────────────────────────────────────────────────────────────────────
+
