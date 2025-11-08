@@ -430,5 +430,8 @@ LANE: OCLIF CLI Application
         │
         ▼
   ● End Event (Success): CLI task completed
+
+=====curl -u "abc123:xyz789" https://api.example.com/v1/users
+
 ──────────────────────────────────────────────────────────────────────────────
 
